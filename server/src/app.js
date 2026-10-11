@@ -37,7 +37,16 @@ const isOriginAllowed = (origin) => {
       return true;
     }
   }
-  return origin === config.clientUrl;
+  // Allow configured clientUrl, or any onrender.com deployment domain, or localhost
+  if (
+    origin === config.clientUrl ||
+    origin.endsWith('.onrender.com') ||
+    origin.includes('localhost') ||
+    origin.includes('127.0.0.1')
+  ) {
+    return true;
+  }
+  return false;
 };
 
 app.use(cors({

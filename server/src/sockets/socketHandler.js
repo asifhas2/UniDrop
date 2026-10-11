@@ -11,7 +11,14 @@ export const initSocketServer = (httpServer) => {
         if (!origin || config.env === 'development') {
           return callback(null, true);
         }
-        callback(null, origin === config.clientUrl);
+        if (
+          origin === config.clientUrl ||
+          origin.endsWith('.onrender.com') ||
+          origin.includes('localhost')
+        ) {
+          return callback(null, true);
+        }
+        callback(null, false);
       },
       methods: ['GET', 'POST'],
       credentials: true,
