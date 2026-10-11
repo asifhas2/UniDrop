@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "description": "UniDrop - Secure QR-Based Peer-to-Peer File Transfer System for University Computer Labs",
   "private": true,
+  "type": "module",
   "scripts": {
+    "postinstall": "npm run build",
     "install:server": "npm --prefix server install",
     "install:client": "npm --prefix client install",
     "install:all": "npm install && npm --prefix server install && npm --prefix client install",
