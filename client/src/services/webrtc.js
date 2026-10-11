@@ -92,9 +92,8 @@ export class WebRTCManager {
   }
 
   setupSignalingListeners() {
-    // Listen for incoming offer
-    this.socket.on('webrtc_offer', async ({ sdp, fromDeviceId }) => {
-      if (this.role === 'host') return; // Host creates the offer
+    this.handleOffer = async ({ sdp }) => {
+      if (this.role === 'host' || !this.pc) return;
       try {
         await this.pc.setRemoteDescription(new RTCSessionDescription(sdp));
         const answer = await this.pc.createAnswer();
@@ -105,30 +104,32 @@ export class WebRTCManager {
           sdp: answer,
         });
       } catch (err) {
-        this.onError('Failed to negotiate WebRTC answer: ' + err.message);
+        console.warn('[WebRTC] Offer handling warning:', err.message);
       }
-    });
+    };
 
-    // Listen for incoming answer
-    this.socket.on('webrtc_answer', async ({ sdp }) => {
+    this.handleAnswer = async ({ sdp }) => {
+      if (!this.pc || this.pc.signalingState !== 'have-local-offer') return;
       try {
         await this.pc.setRemoteDescription(new RTCSessionDescription(sdp));
       } catch (err) {
-        this.onError('Failed to set remote WebRTC answer: ' + err.message);
+        console.warn('[WebRTC] Answer handling warning:', err.message);
       }
-    });
+    };
 
-    // Listen for incoming ICE candidates
-    this.socket.on('ice_candidate', async ({ candidate }) => {
+    this.handleIceCandidate = async ({ candidate }) => {
       try {
-        if (candidate && this.pc) {
+        if (candidate && this.pc && this.pc.remoteDescription) {
           await this.pc.addIceCandidate(new RTCIceCandidate(candidate));
         }
       } catch (err) {
-        // Safe catch for out-of-order candidates
         console.warn('[WebRTC] Non-fatal ICE candidate warning:', err.message);
       }
-    });
+    };
+
+    this.socket.on('webrtc_offer', this.handleOffer);
+    this.socket.on('webrtc_answer', this.handleAnswer);
+    this.socket.on('ice_candidate', this.handleIceCandidate);
   }
 
   // Host initiates connection offer
@@ -320,6 +321,11 @@ export class WebRTCManager {
   }
 
   close() {
+    if (this.socket) {
+      if (this.handleOffer) this.socket.off('webrtc_offer', this.handleOffer);
+      if (this.handleAnswer) this.socket.off('webrtc_answer', this.handleAnswer);
+      if (this.handleIceCandidate) this.socket.off('ice_candidate', this.handleIceCandidate);
+    }
     if (this.dataChannel) {
       try { this.dataChannel.close(); } catch {}
       this.dataChannel = null;
