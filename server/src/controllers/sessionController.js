@@ -32,6 +32,16 @@ export const joinSession = async (req, res, next) => {
       ip: req.ip,
     });
 
+    // Notify host workstation immediately through WebSocket room
+    const io = req.app.get('io');
+    if (io && sessionData.sessionId) {
+      io.to(sessionData.sessionId).emit('peer_joined', {
+        deviceId: validated.peerDeviceId,
+        role: 'peer',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
     res.status(200).json({
       success: true,
       data: sessionData,

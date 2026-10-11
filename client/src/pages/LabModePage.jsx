@@ -31,18 +31,22 @@ export const LabModePage = () => {
 
   // When a peer connects, redirect smoothly to the Transfer screen
   useEffect(() => {
-    if (peerDevice) {
+    if (peerDevice || session?.status === 'paired') {
       navigate('/transfer');
     }
-  }, [peerDevice, navigate]);
+  }, [peerDevice, session?.status, navigate]);
 
   const generateQrForHost = async (hostIp, data) => {
     if (!data) return;
-    const port = window.location.port ? `:${window.location.port}` : '';
-    const protocol = window.location.protocol;
-    const joinBaseUrl = (hostIp && hostIp !== 'localhost')
-      ? `${protocol}//${hostIp}${port}`
-      : window.location.origin;
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    
+    let joinBaseUrl = window.location.origin;
+    if (isLocalhost) {
+      const port = window.location.port ? `:${window.location.port}` : '';
+      const protocol = window.location.protocol;
+      const targetHost = (hostIp && hostIp !== 'localhost') ? hostIp : '192.168.0.107';
+      joinBaseUrl = `${protocol}//${targetHost}${port}`;
+    }
 
     const joinUrl = `${joinBaseUrl}/join?qrToken=${data.qrToken}&sessionId=${data.sessionId}`;
 
@@ -65,7 +69,8 @@ export const LabModePage = () => {
       const data = await initSession(labId);
       setSessionRawData(data);
 
-      const resolvedHost = data.networkIp || mobileHost;
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const resolvedHost = isLocalhost ? (data.networkIp || mobileHost) : window.location.hostname;
       setMobileHost(resolvedHost);
 
       await generateQrForHost(resolvedHost, data);
@@ -189,28 +194,42 @@ export const LabModePage = () => {
             )}
           </div>
 
-          {/* Wi-Fi / Local Network IP Banner for Mobile Access */}
+          {/* Network Banner */}
           <div className="w-full bg-slate-900/90 border border-slate-700/80 rounded-2xl p-3 mb-4 text-left">
             <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1.5">
               <span className="flex items-center gap-1 font-semibold text-slate-300">
                 <Wifi className="w-3.5 h-3.5 text-cyan-400" />
-                Phone Wi-Fi Pairing IP:
+                {window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                  ? 'Phone Wi-Fi Pairing IP:'
+                  : 'Cloud Gateway Active:'}
               </span>
-              <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                Same Wi-Fi
+              <span className={`text-[10px] px-1.5 py-0.5 rounded border ${
+                window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                  ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                  : 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20'
+              }`}>
+                {window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                  ? 'Same Wi-Fi'
+                  : 'Any Network (5G / Wi-Fi)'}
               </span>
             </div>
-            <div className="flex items-center gap-1 bg-slate-950 px-2.5 py-1.5 rounded-lg border border-slate-800">
-              <span className="text-[11px] text-slate-500 font-mono">http://</span>
-              <input
-                type="text"
-                value={mobileHost}
-                onChange={(e) => handleHostIpChange(e.target.value.trim())}
-                className="flex-1 bg-transparent text-cyan-300 font-mono text-xs font-semibold focus:outline-none"
-                placeholder="192.168.0.107"
-              />
-              <span className="text-[11px] text-slate-500 font-mono">:5173</span>
-            </div>
+            {window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? (
+              <div className="flex items-center gap-1 bg-slate-950 px-2.5 py-1.5 rounded-lg border border-slate-800">
+                <span className="text-[11px] text-slate-500 font-mono">http://</span>
+                <input
+                  type="text"
+                  value={mobileHost}
+                  onChange={(e) => handleHostIpChange(e.target.value.trim())}
+                  className="flex-1 bg-transparent text-cyan-300 font-mono text-xs font-semibold focus:outline-none"
+                  placeholder="192.168.0.107"
+                />
+                <span className="text-[11px] text-slate-500 font-mono">:5173</span>
+              </div>
+            ) : (
+              <div className="bg-slate-950 px-2.5 py-1.5 rounded-lg border border-slate-800 truncate">
+                <span className="text-cyan-300 font-mono text-xs font-semibold">{window.location.origin}</span>
+              </div>
+            )}
           </div>
 
           {/* Countdown Timer */}
@@ -230,7 +249,7 @@ export const LabModePage = () => {
               Alternative Numeric PIN
             </h3>
             <p className="text-xs text-slate-400 mb-4">
-              If camera scanning is not available, enter this 6-digit numeric PIN at <span className="text-blue-400 font-mono">http://{mobileHost}:5173/join</span> on your phone:
+              If camera scanning is not available, enter this 6-digit numeric PIN at <span className="text-blue-400 font-mono">{window.location.origin}/join</span> on your phone:
             </p>
 
             <div className="flex items-center gap-3">
@@ -253,15 +272,15 @@ export const LabModePage = () => {
             <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Pairing Instructions</h4>
             <div className="flex items-start gap-3 text-xs text-slate-400">
               <div className="w-5 h-5 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">1</div>
-              <span>Make sure your phone is connected to the same Wi-Fi network as this computer.</span>
+              <span>Scan the QR code directly with your smartphone's camera.</span>
             </div>
             <div className="flex items-start gap-3 text-xs text-slate-400">
               <div className="w-5 h-5 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">2</div>
-              <span>Scan the QR code with your phone camera, or visit <span className="text-slate-200 font-mono">http://{mobileHost}:5173/join</span>.</span>
+              <span>Once scanned, tap the link on your phone. You will be redirected instantly to the upload page.</span>
             </div>
             <div className="flex items-start gap-3 text-xs text-slate-400">
               <div className="w-5 h-5 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">3</div>
-              <span>Both devices will automatically open the transfer screen to send files back and forth.</span>
+              <span>This computer will also automatically switch to the transfer screen.</span>
             </div>
           </div>
 

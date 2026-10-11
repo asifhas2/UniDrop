@@ -98,8 +98,9 @@ export const TransferPage = () => {
               </span>
             </div>
             <p className="text-xs text-slate-400">
+              {session?.role === 'peer' ? '📱 Mobile Device' : '💻 Lab Workstation'} •{' '}
               {session?.labComputerId ? `Workstation ${session.labComputerId} • ` : ''}
-              {peerDevice ? 'Connected to peer' : 'Awaiting peer connection...'}
+              {peerDevice ? 'Connected to peer' : 'Bridge Ready'}
             </p>
           </div>
         </div>
@@ -126,7 +127,7 @@ export const TransferPage = () => {
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onClick={() => fileInputRef.current?.click()}
-        className={`glass-panel-glow p-10 sm:p-14 rounded-3xl border-2 border-dashed transition-all cursor-pointer text-center ${
+        className={`glass-panel-glow p-8 sm:p-14 rounded-3xl border-2 border-dashed transition-all cursor-pointer text-center ${
           isDragging
             ? 'border-blue-500 bg-blue-500/10 scale-[1.01]'
             : 'border-slate-700/80 hover:border-slate-600 bg-slate-900/40'
@@ -144,23 +145,28 @@ export const TransferPage = () => {
           <UploadCloud className="w-8 h-8" />
         </div>
 
-        <h3 className="text-lg font-bold text-white mb-2">Drag and drop files here to transfer</h3>
+        <h3 className="text-lg font-bold text-white mb-2">
+          {session?.role === 'peer' ? 'Tap to Select Files from Your Phone' : 'Drag & Drop or Browse Files to Transfer'}
+        </h3>
         <p className="text-xs text-slate-400 max-w-md mx-auto mb-6">
-          PDFs, assignments, source code, presentations, or project ZIPs. Transfers directly over WebRTC.
+          Photos, assignments, PDFs, presentations, or project archives. Files stream directly between devices.
         </p>
 
         <button
           type="button"
           disabled={uploading}
-          className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs shadow-lg shadow-blue-600/30 transition-all pointer-events-none"
+          className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-semibold text-xs shadow-lg shadow-blue-600/30 transition-all pointer-events-none"
         >
           {uploading ? (
             <>
-              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-              <span>Sending...</span>
+              <RefreshCw className="w-4 h-4 animate-spin" />
+              <span>Transferring...</span>
             </>
           ) : (
-            <span>Browse Files</span>
+            <>
+              <UploadCloud className="w-4 h-4" />
+              <span>{session?.role === 'peer' ? 'Choose Files from Phone' : 'Select Files to Send'}</span>
+            </>
           )}
         </button>
       </div>
