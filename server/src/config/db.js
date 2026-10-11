@@ -1,5 +1,4 @@
 import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import { config } from './environment.js';
 import { logger } from '../utils/logger.js';
 
@@ -10,10 +9,17 @@ export const connectDatabase = async () => {
     let uri = config.mongoUri;
 
     if (!uri) {
-      logger.info('[Database] No MONGODB_URI specified. Initializing in-memory MongoDB engine for zero-dependency local execution...');
-      mongodInstance = await MongoMemoryServer.create();
-      uri = mongodInstance.getUri();
-      logger.info(`[Database] In-memory MongoDB initialized at: ${uri}`);
+      logger.info('[Database] No MONGODB_URI specified. Attempting in-memory MongoDB engine...');
+      try {
+        const { MongoMemoryServer } = await import('mongodb-memory-server');
+        mongodInstance = await MongoMemoryServer.create();
+        uri = mongodInstance.getUri();
+        logger.info(`[Database] In-memory MongoDB initialized at: ${uri}`);
+      } catch (err) {
+        logger.error('[Database] CRITICAL: MONGODB_URI environment variable is not defined!');
+        logger.error('[Database] In production (e.g. Render), please add MONGODB_URI to your Environment Variables dashboard.');
+        throw new Error('Missing MONGODB_URI environment variable. Please set MONGODB_URI in Render dashboard.');
+      }
     }
 
     mongoose.set('strictQuery', true);
