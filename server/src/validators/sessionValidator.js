@@ -11,6 +11,7 @@ export const createSessionSchema = z.object({
 });
 
 export const joinSessionSchema = z.object({
+  sessionId: z.string().trim().optional(),
   qrToken: z.string().trim().length(64).optional(),
   pinCode: z.string().trim().regex(/^\d{6}$/, 'PIN must be exactly 6 digits').optional(),
   peerDeviceId: z.string().trim().min(3).max(100),

@@ -8,6 +8,7 @@ import {
   generatePin,
   hashPin,
 } from '../utils/cryptoUtils.js';
+import { getLocalNetworkIp } from '../utils/networkUtils.js';
 import { recordAuditLog } from './auditService.js';
 import { logger } from '../utils/logger.js';
 
@@ -67,6 +68,7 @@ export const createSession = async ({ labComputerId, hostDeviceId, ip }) => {
     expiresAt: session.expiresAt,
     maxFileSize: session.maxFileSize,
     labComputerId: verifiedLabId,
+    networkIp: getLocalNetworkIp(),
   };
 };
 

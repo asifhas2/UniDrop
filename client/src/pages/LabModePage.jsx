@@ -1,13 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import QRCode from 'qrcode';
-import { Monitor, RefreshCw, Copy, Check, Clock, ShieldCheck, AlertCircle, ArrowRight, UserCheck } from 'lucide-react';
+import {
+  Monitor, RefreshCw, Copy, Check, Clock, ShieldCheck,
+  AlertCircle, ArrowRight, UserCheck, Smartphone, Wifi
+} from 'lucide-react';
 import { useSession } from '../context/SessionContext.jsx';
 
 export const LabModePage = () => {
-  const { session, peerDevice, initSession, disconnectSession } = useSession();
+  const { session, peerDevice, initSession } = useSession();
   const [labId, setLabId] = useState(() => localStorage.getItem('unidrop_lab_id') || 'LAB-01');
   const [qrDataUrl, setQrDataUrl] = useState('');
+  const [mobileHost, setMobileHost] = useState(() => {
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return '192.168.0.107'; // Default detected local Wi-Fi IP
+    }
+    return window.location.hostname;
+  });
+  const [sessionRawData, setSessionRawData] = useState(null);
   const [timeLeft, setTimeLeft] = useState(300); // 5 minutes in seconds
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -26,24 +36,39 @@ export const LabModePage = () => {
     }
   }, [peerDevice, navigate]);
 
+  const generateQrForHost = async (hostIp, data) => {
+    if (!data) return;
+    const port = window.location.port ? `:${window.location.port}` : '';
+    const protocol = window.location.protocol;
+    const joinBaseUrl = (hostIp && hostIp !== 'localhost')
+      ? `${protocol}//${hostIp}${port}`
+      : window.location.origin;
+
+    const joinUrl = `${joinBaseUrl}/join?qrToken=${data.qrToken}&sessionId=${data.sessionId}`;
+
+    const url = await QRCode.toDataURL(joinUrl, {
+      width: 320,
+      margin: 2,
+      color: {
+        dark: '#0f172a',
+        light: '#ffffff',
+      },
+    });
+    setQrDataUrl(url);
+  };
+
   const handleGenerateSession = async () => {
     try {
       setLoading(true);
       setError('');
       localStorage.setItem('unidrop_lab_id', labId);
       const data = await initSession(labId);
+      setSessionRawData(data);
 
-      // Construct pairing URL for QR Code
-      const joinUrl = `${window.location.origin}/join?qrToken=${data.qrToken}&sessionId=${data.sessionId}`;
-      const url = await QRCode.toDataURL(joinUrl, {
-        width: 320,
-        margin: 2,
-        color: {
-          dark: '#0f172a',
-          light: '#ffffff',
-        },
-      });
-      setQrDataUrl(url);
+      const resolvedHost = data.networkIp || mobileHost;
+      setMobileHost(resolvedHost);
+
+      await generateQrForHost(resolvedHost, data);
 
       // Calculate initial countdown
       const diffSecs = Math.max(0, Math.floor((new Date(data.expiresAt).getTime() - Date.now()) / 1000));
@@ -52,6 +77,13 @@ export const LabModePage = () => {
       setError(err.message || 'Failed to initialize lab workstation session.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleHostIpChange = async (newIp) => {
+    setMobileHost(newIp);
+    if (sessionRawData) {
+      await generateQrForHost(newIp, sessionRawData);
     }
   };
 
@@ -157,6 +189,30 @@ export const LabModePage = () => {
             )}
           </div>
 
+          {/* Wi-Fi / Local Network IP Banner for Mobile Access */}
+          <div className="w-full bg-slate-900/90 border border-slate-700/80 rounded-2xl p-3 mb-4 text-left">
+            <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1.5">
+              <span className="flex items-center gap-1 font-semibold text-slate-300">
+                <Wifi className="w-3.5 h-3.5 text-cyan-400" />
+                Phone Wi-Fi Pairing IP:
+              </span>
+              <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                Same Wi-Fi
+              </span>
+            </div>
+            <div className="flex items-center gap-1 bg-slate-950 px-2.5 py-1.5 rounded-lg border border-slate-800">
+              <span className="text-[11px] text-slate-500 font-mono">http://</span>
+              <input
+                type="text"
+                value={mobileHost}
+                onChange={(e) => handleHostIpChange(e.target.value.trim())}
+                className="flex-1 bg-transparent text-cyan-300 font-mono text-xs font-semibold focus:outline-none"
+                placeholder="192.168.0.107"
+              />
+              <span className="text-[11px] text-slate-500 font-mono">:5173</span>
+            </div>
+          </div>
+
           {/* Countdown Timer */}
           <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-slate-900/90 border border-slate-700/80 text-xs">
             <Clock className={`w-3.5 h-3.5 ${timeLeft < 60 ? 'text-rose-400 animate-pulse' : 'text-blue-400'}`} />
@@ -174,7 +230,7 @@ export const LabModePage = () => {
               Alternative Numeric PIN
             </h3>
             <p className="text-xs text-slate-400 mb-4">
-              If camera scanning is not available, enter this 6-digit numeric PIN at <span className="text-blue-400 font-mono">/join</span> on your phone or laptop:
+              If camera scanning is not available, enter this 6-digit numeric PIN at <span className="text-blue-400 font-mono">http://{mobileHost}:5173/join</span> on your phone:
             </p>
 
             <div className="flex items-center gap-3">
@@ -197,15 +253,15 @@ export const LabModePage = () => {
             <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Pairing Instructions</h4>
             <div className="flex items-start gap-3 text-xs text-slate-400">
               <div className="w-5 h-5 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">1</div>
-              <span>Open the native Camera app on your smartphone or visit <span className="text-slate-200 font-mono">{window.location.origin}/join</span>.</span>
+              <span>Make sure your phone is connected to the same Wi-Fi network as this computer.</span>
             </div>
             <div className="flex items-start gap-3 text-xs text-slate-400">
               <div className="w-5 h-5 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">2</div>
-              <span>Scan the QR code or type the 6-digit PIN to establish an authenticated direct tunnel.</span>
+              <span>Scan the QR code with your phone camera, or visit <span className="text-slate-200 font-mono">http://{mobileHost}:5173/join</span>.</span>
             </div>
             <div className="flex items-start gap-3 text-xs text-slate-400">
               <div className="w-5 h-5 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center font-bold text-[10px] shrink-0 mt-0.5">3</div>
-              <span>This screen will automatically transition into the file transfer interface upon connection.</span>
+              <span>Both devices will automatically open the transfer screen to send files back and forth.</span>
             </div>
           </div>
 

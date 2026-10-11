@@ -6,7 +6,13 @@ import { config } from '../config/environment.js';
 export const initSocketServer = (httpServer) => {
   const io = new Server(httpServer, {
     cors: {
-      origin: [config.clientUrl, 'http://localhost:5173', 'http://127.0.0.1:5173'],
+      origin: (origin, callback) => {
+        // Allow all local LAN or localhost origins in development
+        if (!origin || config.env === 'development') {
+          return callback(null, true);
+        }
+        callback(null, origin === config.clientUrl);
+      },
       methods: ['GET', 'POST'],
       credentials: true,
     },

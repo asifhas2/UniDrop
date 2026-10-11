@@ -151,10 +151,11 @@ export const SessionProvider = ({ children }) => {
   };
 
   // Join session (Student Phone / Laptop)
-  const joinSession = async ({ qrToken, pinCode }) => {
+  const joinSession = async ({ qrToken, pinCode, sessionId }) => {
     const res = await api.post('/sessions/join', {
       qrToken,
       pinCode,
+      sessionId,
       peerDeviceId: deviceId,
     });
     const data = res.data.data;

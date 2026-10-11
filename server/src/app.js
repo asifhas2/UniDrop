@@ -20,20 +20,29 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
 
-// CORS Configuration
-const allowedOrigins = [
-  config.clientUrl,
-  'http://localhost:5173',
-  'http://127.0.0.1:5173',
-];
+// CORS Configuration supporting local network pairing (mobile phones on Wi-Fi)
+const isOriginAllowed = (origin) => {
+  if (!origin) return true;
+  if (config.env === 'development') {
+    if (
+      origin.includes('localhost') ||
+      origin.includes('127.0.0.1') ||
+      origin.includes('192.168.') ||
+      origin.startsWith('http://10.') ||
+      origin.startsWith('http://172.')
+    ) {
+      return true;
+    }
+  }
+  return origin === config.clientUrl;
+};
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow non-browser requests or matching origins
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (isOriginAllowed(origin)) {
       return callback(null, true);
     }
-    return callback(new Error('CORS request blocked by security policy.'));
+    return callback(new Error(`CORS request from ${origin} blocked by security policy.`));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
