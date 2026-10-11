@@ -1,6 +1,9 @@
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import { config } from './config/environment.js';
 import { requestLogger } from './middleware/requestLogger.js';
 import { apiLimiter } from './middleware/rateLimiter.js';
@@ -65,15 +68,30 @@ app.use('/api/transfers', transferRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/health', healthRoutes);
 
-// Root greeting / information endpoint
-app.get('/', (req, res) => {
-  res.json({
-    name: 'UniDrop API Gateway',
-    version: '1.0.0',
-    description: 'Secure QR-Based Peer-to-Peer File Transfer System for University Computer Labs',
-    healthCheck: '/api/health',
+// Static Frontend Delivery for Unified Cloud Deployment (Render / Production)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const clientDistPath = path.resolve(__dirname, '../../client/dist');
+
+if (fs.existsSync(clientDistPath)) {
+  app.use(express.static(clientDistPath));
+  app.get('*', (req, res, next) => {
+    if (req.originalUrl.startsWith('/api') || req.originalUrl.startsWith('/socket.io')) {
+      return next();
+    }
+    res.sendFile(path.join(clientDistPath, 'index.html'));
   });
-});
+} else {
+  // Fallback API Greeting if frontend bundle not built
+  app.get('/', (req, res) => {
+    res.json({
+      name: 'UniDrop API Gateway',
+      version: '1.0.0',
+      description: 'Secure QR-Based Peer-to-Peer File Transfer System for University Computer Labs',
+      healthCheck: '/api/health',
+    });
+  });
+}
 
 // 404 & Central Error Handling
 app.use(notFoundHandler);
