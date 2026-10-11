@@ -1,0 +1,45 @@
+name: UniDrop CI Pipeline
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [ 20.x, 22.x ]
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install Server Dependencies
+        working-directory: ./server
+        run: npm ci
+
+      - name: Run Server Tests
+        working-directory: ./server
+        env:
+          NODE_ENV: test
+          SESSION_SECRET: test-secret-must-be-min-32-chars-long-dummy
+          ADMIN_JWT_SECRET: test-jwt-secret-min-32-chars-long-dummy
+        run: npm test
+
+      - name: Install Client Dependencies
+        working-directory: ./client
+        run: npm ci
+
+      - name: Build Client Production Bundle
+        working-directory: ./client
+        run: npm run build

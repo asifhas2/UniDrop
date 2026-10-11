@@ -1,0 +1,20 @@
+{
+  "name": "unidrop-monorepo",
+  "version": "1.0.0",
+  "description": "UniDrop - Secure QR-Based Peer-to-Peer File Transfer System for University Computer Labs",
+  "private": true,
+  "scripts": {
+    "install:server": "npm --prefix server install",
+    "install:client": "npm --prefix client install",
+    "install:all": "npm install && npm --prefix server install && npm --prefix client install",
+    "server": "npm --prefix server run dev",
+    "client": "npm --prefix client run dev",
+    "dev": "concurrently -n \"SERVER,CLIENT\" -c \"cyan,magenta\" \"npm --prefix server run dev\" \"npm --prefix client run dev\"",
+    "build:client": "npm --prefix client run build",
+    "test": "npm --prefix server test",
+    "test:load": "node tests/load/run-load-test.js"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
