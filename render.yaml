@@ -1,0 +1,43 @@
+services:
+  - type: web
+    name: unidrop
+    env: node
+    plan: free
+    region: oregon
+    buildCommand: npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: MONGODB_URI
+        value: mongodb+srv://UniDrop:j4qZuV5u6HzmbTBl@cluster0.etvdx8p.mongodb.net/unidrop?retryWrites=true&w=majority&appName=Cluster0
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: ADMIN_JWT_SECRET
+        generateValue: true
+      - key: ADMIN_JWT_EXPIRES_IN
+        value: 8h
+      - key: DEFAULT_ADMIN_USERNAME
+        value: admin
+      - key: DEFAULT_ADMIN_PASSWORD
+        value: UniDropAdmin2026!
+      - key: DEFAULT_ADMIN_EMAIL
+        value: admin@unidrop.local
+      - key: FILE_MAX_SIZE_BYTES
+        value: 104857600
+      - key: SESSION_TTL_MINUTES
+        value: 10
+      - key: TEMP_FILE_TTL_MINUTES
+        value: 15
+      - key: PAIRING_PIN_TTL_MINUTES
+        value: 5
+      - key: RATE_LIMIT_WINDOW_MS
+        value: 900000
+      - key: RATE_LIMIT_MAX_REQUESTS
+        value: 500
+      - key: STUN_SERVERS
+        value: stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302

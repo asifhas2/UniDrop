@@ -46,14 +46,16 @@ export const LabModePage = () => {
     
     let joinBaseUrl = window.location.origin;
     if (isLocalhost) {
-      if (hostIp && (hostIp.startsWith('http://') || hostIp.startsWith('https://'))) {
-        joinBaseUrl = hostIp.replace(/\/+$/, '');
-      } else if (hostIp && hostIp.includes('.onrender.com')) {
-        joinBaseUrl = `https://${hostIp.replace(/\/+$/, '')}`;
+      const cleanHost = (hostIp || '').trim();
+      if (cleanHost.startsWith('http://') || cleanHost.startsWith('https://')) {
+        joinBaseUrl = cleanHost.replace(/\/+$/, '');
+      } else if (cleanHost.includes('.') && !/^\d+\.\d+\.\d+\.\d+$/.test(cleanHost)) {
+        // Live cloud domain (e.g. unidrop.onrender.com or custom domain)
+        joinBaseUrl = `https://${cleanHost.replace(/\/+$/, '')}`;
       } else {
         const port = window.location.port ? `:${window.location.port}` : '';
         const protocol = window.location.protocol;
-        const targetHost = (hostIp && hostIp !== 'localhost') ? hostIp : '192.168.0.107';
+        const targetHost = (cleanHost && cleanHost !== 'localhost') ? cleanHost : '192.168.0.107';
         joinBaseUrl = `${protocol}//${targetHost}${port}`;
       }
     }
@@ -80,7 +82,9 @@ export const LabModePage = () => {
       setSessionRawData(data);
 
       const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      const resolvedHost = isLocalhost ? (data.networkIp || mobileHost) : window.location.hostname;
+      const savedHost = localStorage.getItem('unidrop_mobile_host');
+      const customHost = (savedHost && savedHost !== 'localhost') ? savedHost : (mobileHost && mobileHost !== 'localhost' ? mobileHost : null);
+      const resolvedHost = isLocalhost ? (customHost || data.networkIp || 'localhost') : window.location.hostname;
       setMobileHost(resolvedHost);
       localStorage.setItem('unidrop_mobile_host', resolvedHost);
 

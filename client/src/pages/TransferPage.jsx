@@ -50,15 +50,13 @@ export const TransferPage = () => {
       const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
       let joinBaseUrl = window.location.origin;
       if (isLocalhost) {
-        const savedHost = localStorage.getItem('unidrop_mobile_host') || '192.168.0.107';
+        const savedHost = (localStorage.getItem('unidrop_mobile_host') || '192.168.0.107').trim();
         if (savedHost.startsWith('http://') || savedHost.startsWith('https://')) {
           joinBaseUrl = savedHost.replace(/\/+$/, '');
-        } else if (savedHost.includes('.onrender.com')) {
+        } else if (savedHost.includes('.') && !/^\d+\.\d+\.\d+\.\d+$/.test(savedHost)) {
           joinBaseUrl = `https://${savedHost.replace(/\/+$/, '')}`;
-        } else {
-          const port = window.location.port ? `:${window.location.port}` : '';
-          const protocol = window.location.protocol;
-          joinBaseUrl = `${protocol}//${savedHost}${port}`;
+        } else if (savedHost && savedHost !== 'localhost') {
+          joinBaseUrl = `${window.location.protocol}//${savedHost}:${window.location.port || '5173'}`;
         }
       }
       const joinUrl = `${joinBaseUrl}/join?qrToken=${session.qrToken}&sessionId=${session.sessionId}`;
