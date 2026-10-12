@@ -14,6 +14,9 @@ router.post('/:id/join', pairingLimiter, sessionController.joinSession);
 // Get session details and status
 router.get('/:id', sessionController.getSession);
 
+// Update upload permissions (Host only in Group Work)
+router.patch('/:id/permissions', sessionController.updatePermissions);
+
 // Explicitly disconnect / end session
 router.post('/:id/disconnect', sessionController.disconnectSession);
 

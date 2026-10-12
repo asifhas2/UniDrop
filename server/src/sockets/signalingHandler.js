@@ -11,14 +11,55 @@ export const registerSignalingHandlers = (io, socket) => {
 
       logger.info(`[Socket] Device ${deviceId} (${role}) joined session room: ${sessionId}`);
 
-      // Notify other peer in the room
+      const session = await Session.findOne({ sessionId });
+      const memberCount = session?.connectedDeviceIds?.length || 1;
+      const mode = session?.mode || 'direct';
+      const allowMemberUpload = session?.allowMemberUpload || false;
+
+      // Send initial room state to joining socket
+      socket.emit('room_status', {
+        sessionId,
+        mode,
+        allowMemberUpload,
+        memberCount,
+        connectedDeviceIds: session?.connectedDeviceIds || [],
+      });
+
+      // Notify other peers in the room
       socket.to(sessionId).emit('peer_joined', {
         deviceId,
         role,
+        mode,
+        allowMemberUpload,
+        memberCount,
+        connectedDeviceIds: session?.connectedDeviceIds || [],
         timestamp: new Date().toISOString(),
+      });
+
+      io.to(sessionId).emit('members_updated', {
+        memberCount,
+        connectedDeviceIds: session?.connectedDeviceIds || [],
       });
     } catch (err) {
       logger.error('[Socket] Error in join_session_room:', { error: err.message });
+    }
+  });
+
+  // Host toggles member upload permission via socket
+  socket.on('toggle_member_upload', async ({ sessionId, hostDeviceId, allowMemberUpload }) => {
+    try {
+      const session = await Session.findOne({ sessionId });
+      if (session && session.hostDeviceId === hostDeviceId) {
+        session.allowMemberUpload = Boolean(allowMemberUpload);
+        await session.save();
+        io.to(sessionId).emit('permissions_updated', {
+          sessionId,
+          allowMemberUpload: session.allowMemberUpload,
+        });
+        logger.info(`[Signaling] Upload permissions updated for ${sessionId}: allowMemberUpload=${session.allowMemberUpload}`);
+      }
+    } catch (err) {
+      logger.error('[Signaling] Error in toggle_member_upload:', { error: err.message });
     }
   });
 
@@ -88,14 +129,28 @@ export const registerSignalingHandlers = (io, socket) => {
   });
 
   // Disconnect cleanup
-  socket.on('disconnect', () => {
+  socket.on('disconnect', async () => {
     const { sessionId, deviceId, role } = socket.data || {};
     if (sessionId) {
       logger.info(`[Socket] Device ${deviceId || socket.id} disconnected from session ${sessionId}`);
-      socket.to(sessionId).emit('peer_disconnected', {
-        deviceId,
-        role,
-      });
+      try {
+        const session = await Session.findOne({ sessionId });
+        const memberCount = session?.connectedDeviceIds?.length || 0;
+        socket.to(sessionId).emit('peer_disconnected', {
+          deviceId,
+          role,
+          memberCount,
+        });
+        socket.to(sessionId).emit('members_updated', {
+          memberCount,
+          connectedDeviceIds: session?.connectedDeviceIds || [],
+        });
+      } catch (e) {
+        socket.to(sessionId).emit('peer_disconnected', {
+          deviceId,
+          role,
+        });
+      }
     }
   });
 };

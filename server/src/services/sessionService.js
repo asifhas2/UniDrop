@@ -1,6 +1,8 @@
 import { Session } from '../models/Session.js';
 import { LabComputer } from '../models/LabComputer.js';
+import { Transfer } from '../models/Transfer.js';
 import { config } from '../config/environment.js';
+import { safeUnlink } from '../utils/fileUtils.js';
 import {
   generateSessionId,
   generatePairingToken,
@@ -12,7 +14,7 @@ import { getLocalNetworkIp } from '../utils/networkUtils.js';
 import { recordAuditLog } from './auditService.js';
 import { logger } from '../utils/logger.js';
 
-export const createSession = async ({ labComputerId, hostDeviceId, ip }) => {
+export const createSession = async ({ labComputerId, hostDeviceId, mode = 'direct', allowMemberUpload = false, ip }) => {
   const sessionId = generateSessionId();
   const pairingToken = generatePairingToken();
   const pairingTokenHash = hashToken(pairingToken);
@@ -45,6 +47,8 @@ export const createSession = async ({ labComputerId, hostDeviceId, ip }) => {
     pinCodeHash,
     hostDeviceId,
     labComputerId: verifiedLabId,
+    mode: mode === 'group' ? 'group' : 'direct',
+    allowMemberUpload: mode === 'group' ? Boolean(allowMemberUpload) : false,
     status: 'pending',
     maxFileSize: config.maxFileSize,
     expiresAt,
@@ -56,13 +60,15 @@ export const createSession = async ({ labComputerId, hostDeviceId, ip }) => {
     severity: 'info',
     actorId: hostDeviceId,
     ip,
-    details: { sessionId, labComputerId: verifiedLabId, expiresAt },
+    details: { sessionId, labComputerId: verifiedLabId, mode: session.mode, allowMemberUpload: session.allowMemberUpload, expiresAt },
   });
 
-  logger.info(`[SessionService] Session created: ${sessionId} (Host: ${hostDeviceId}, Lab: ${verifiedLabId || 'none'})`);
+  logger.info(`[SessionService] Session created: ${sessionId} (Mode: ${session.mode}, Host: ${hostDeviceId}, Lab: ${verifiedLabId || 'none'})`);
 
   return {
     sessionId: session.sessionId,
+    mode: session.mode,
+    allowMemberUpload: session.allowMemberUpload,
     qrToken: pairingToken, // Raw token sent once to host for QR code encoding
     pinCode,              // Raw PIN sent once to host for visual display
     expiresAt: session.expiresAt,
@@ -149,10 +155,12 @@ export const joinSession = async ({ sessionId, qrToken, pinCode, peerDeviceId, i
     throw error;
   }
 
-  // Enforce device count limit (max 2 devices: 1 host + 1 client)
+  // Enforce device count limit based on session mode:
+  // In 'direct' (1-to-1): max 1 peer allowed
+  // In 'group' (Group Work): multiple peers can connect!
   if (!session.connectedDeviceIds.includes(peerDeviceId)) {
-    if (session.connectedDeviceIds.length >= 1) {
-      const error = new Error('This session has already reached maximum connected peers.');
+    if (session.mode === 'direct' && session.connectedDeviceIds.length >= 1) {
+      const error = new Error('This 1-to-1 session has already reached maximum connected peers.');
       error.statusCode = 409;
       error.code = 'SESSION_FULL';
       throw error;
@@ -169,19 +177,49 @@ export const joinSession = async ({ sessionId, qrToken, pinCode, peerDeviceId, i
     severity: 'info',
     actorId: peerDeviceId,
     ip,
-    details: { sessionId: session.sessionId, hostDeviceId: session.hostDeviceId },
+    details: { sessionId: session.sessionId, hostDeviceId: session.hostDeviceId, mode: session.mode },
   });
 
-  logger.info(`[SessionService] Peer joined session: ${session.sessionId} (Peer: ${peerDeviceId})`);
+  logger.info(`[SessionService] Peer joined session: ${session.sessionId} (Peer: ${peerDeviceId}, Mode: ${session.mode}, Total members: ${session.connectedDeviceIds.length})`);
 
   return {
     sessionId: session.sessionId,
     hostDeviceId: session.hostDeviceId,
     connectedDeviceIds: session.connectedDeviceIds,
     status: session.status,
+    mode: session.mode,
+    allowMemberUpload: session.allowMemberUpload,
+    memberCount: session.connectedDeviceIds.length,
     expiresAt: session.expiresAt,
     maxFileSize: session.maxFileSize,
     labComputerId: session.labComputerId,
+  };
+};
+
+export const updateSessionPermissions = async ({ sessionId, hostDeviceId, allowMemberUpload }) => {
+  const session = await Session.findOne({ sessionId });
+  if (!session || !session.isValid()) {
+    const error = new Error('Active session not found.');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (session.hostDeviceId !== hostDeviceId) {
+    const error = new Error('Only the session creator (host) can modify upload permissions.');
+    error.statusCode = 403;
+    throw error;
+  }
+
+  session.allowMemberUpload = Boolean(allowMemberUpload);
+  session.lastActivityAt = new Date();
+  await session.save();
+
+  logger.info(`[SessionService] Updated permissions for session ${sessionId}: allowMemberUpload=${session.allowMemberUpload}`);
+
+  return {
+    sessionId: session.sessionId,
+    mode: session.mode,
+    allowMemberUpload: session.allowMemberUpload,
   };
 };
 
@@ -205,6 +243,9 @@ export const getSessionById = async (sessionId) => {
     status: session.status,
     hostDeviceId: session.hostDeviceId,
     connectedDeviceIds: session.connectedDeviceIds,
+    mode: session.mode,
+    allowMemberUpload: session.allowMemberUpload,
+    memberCount: session.connectedDeviceIds.length,
     labComputerId: session.labComputerId,
     maxFileSize: session.maxFileSize,
     expiresAt: session.expiresAt,
@@ -225,6 +266,20 @@ export const disconnectSession = async ({ sessionId, deviceId, ip }) => {
       { computerId: session.labComputerId },
       { status: 'available', currentSessionId: null, lastHeartbeat: new Date() }
     );
+  }
+
+  // Cleanup any lingering temp relay files for this session
+  try {
+    const activeTransfers = await Transfer.find({ sessionId, tempFilePath: { $ne: null } });
+    for (const t of activeTransfers) {
+      if (t.tempFilePath) {
+        await safeUnlink(t.tempFilePath);
+        t.tempFilePath = null;
+        await t.save();
+      }
+    }
+  } catch (cleanErr) {
+    logger.warn(`[SessionService] Error cleaning up relay files on disconnect: ${cleanErr.message}`);
   }
 
   await recordAuditLog({

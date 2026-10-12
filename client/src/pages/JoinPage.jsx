@@ -172,9 +172,9 @@ export const JoinPage = () => {
           <KeyRound className="w-7 h-7" />
         </div>
 
-        <h1 className="text-2xl font-bold text-white mb-2">Connect to Lab PC</h1>
+        <h1 className="text-2xl font-bold text-white mb-2">Connect to Workstation / Group</h1>
         <p className="text-xs text-slate-400 mb-8 leading-relaxed">
-          Enter the 6-digit PIN displayed on the lab workstation screen to establish a temporary encrypted file bridge.
+          Enter the 6-digit PIN displayed on the workstation screen to join the file transfer session.
         </p>
 
         {error && (

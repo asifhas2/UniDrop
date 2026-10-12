@@ -1,5 +1,5 @@
 import * as sessionService from '../services/sessionService.js';
-import { createSessionSchema, joinSessionSchema, disconnectSessionSchema } from '../validators/sessionValidator.js';
+import { createSessionSchema, joinSessionSchema, disconnectSessionSchema, updatePermissionsSchema } from '../validators/sessionValidator.js';
 
 export const createSession = async (req, res, next) => {
   try {
@@ -32,19 +32,55 @@ export const joinSession = async (req, res, next) => {
       ip: req.ip,
     });
 
-    // Notify host workstation immediately through WebSocket room
+    // Notify host workstation and room immediately through WebSocket room
     const io = req.app.get('io');
     if (io && sessionData.sessionId) {
       io.to(sessionData.sessionId).emit('peer_joined', {
         deviceId: validated.peerDeviceId,
         role: 'peer',
+        mode: sessionData.mode,
+        allowMemberUpload: sessionData.allowMemberUpload,
+        memberCount: sessionData.memberCount,
+        connectedDeviceIds: sessionData.connectedDeviceIds,
         timestamp: new Date().toISOString(),
+      });
+      io.to(sessionData.sessionId).emit('members_updated', {
+        memberCount: sessionData.memberCount,
+        connectedDeviceIds: sessionData.connectedDeviceIds,
       });
     }
 
     res.status(200).json({
       success: true,
       data: sessionData,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const updatePermissions = async (req, res, next) => {
+  try {
+    const sessionId = req.params.id;
+    const validated = updatePermissionsSchema.parse(req.body);
+
+    const result = await sessionService.updateSessionPermissions({
+      sessionId,
+      hostDeviceId: validated.hostDeviceId,
+      allowMemberUpload: validated.allowMemberUpload,
+    });
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(sessionId).emit('permissions_updated', {
+        sessionId,
+        allowMemberUpload: result.allowMemberUpload,
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: result,
     });
   } catch (err) {
     next(err);

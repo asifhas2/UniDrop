@@ -32,6 +32,14 @@ export const initTransfer = async ({
     throw error;
   }
 
+  // Permission check for Group Work mode:
+  // If in group mode, members can only upload if allowMemberUpload is enabled by the creator
+  if (session.mode === 'group' && senderDeviceId !== session.hostDeviceId && !session.allowMemberUpload) {
+    const error = new Error('Upload permission restricted: Only the session host is allowed to send files in this group.');
+    error.statusCode = 403;
+    throw error;
+  }
+
   const transferId = uuidv4();
   const expiresAt = new Date(Date.now() + config.tempFileTtlMinutes * 60 * 1000);
 
@@ -108,12 +116,21 @@ export const handleRelayDownload = async ({ transferId, res, ip }) => {
 
   fileStream.pipe(res);
 
-  // Shred and unlink file once download is finished to ensure zero lingering data on server
+  // Check if session is group mode
+  const session = await Session.findOne({ sessionId: transfer.sessionId });
+  const isGroupSession = session && session.mode === 'group';
+
+  // Shred and unlink file once download is finished for 1-to-1 sessions
+  // For group sessions, the file stays available for other members until session termination or TTL cleanup
   fileStream.on('end', async () => {
     try {
-      logger.info(`[TransferService] Relay download finished for transfer ${transferId}. Unlinking ephemeral file...`);
-      await safeUnlink(transfer.tempFilePath);
-      transfer.tempFilePath = null;
+      if (!isGroupSession) {
+        logger.info(`[TransferService] 1-to-1 relay download finished for transfer ${transferId}. Unlinking ephemeral file...`);
+        await safeUnlink(transfer.tempFilePath);
+        transfer.tempFilePath = null;
+      } else {
+        logger.info(`[TransferService] Group relay download finished by client for transfer ${transferId}. File preserved for other members.`);
+      }
       
       if (mongoose.connection && mongoose.connection.readyState === 1) {
         await transfer.save();
@@ -122,7 +139,7 @@ export const handleRelayDownload = async ({ transferId, res, ip }) => {
           severity: 'info',
           actorId: transfer.receiverDeviceId || 'client',
           ip,
-          details: { transferId, fileName: transfer.fileName, fileSize: transfer.fileSize },
+          details: { transferId, fileName: transfer.fileName, fileSize: transfer.fileSize, isGroup: isGroupSession },
         });
       }
     } catch (err) {

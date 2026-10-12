@@ -3,6 +3,8 @@ import { z } from 'zod';
 export const createSessionSchema = z.object({
   labComputerId: z.string().trim().max(50).optional().nullable(),
   hostDeviceId: z.string().trim().min(3).max(100),
+  mode: z.enum(['direct', 'group']).optional().default('direct'),
+  allowMemberUpload: z.boolean().optional().default(false),
   deviceInfo: z.object({
     browser: z.string().optional(),
     os: z.string().optional(),
@@ -28,3 +30,9 @@ export const disconnectSessionSchema = z.object({
   deviceId: z.string().trim().min(3).max(100),
   reason: z.string().trim().max(200).optional(),
 });
+
+export const updatePermissionsSchema = z.object({
+  hostDeviceId: z.string().trim().min(3).max(100),
+  allowMemberUpload: z.boolean(),
+});
+

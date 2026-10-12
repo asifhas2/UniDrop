@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Monitor, QrCode, ArrowRight, ShieldCheck, Zap, Lock, HardDrive, Smartphone, CheckCircle2 } from 'lucide-react';
+import { Monitor, QrCode, ArrowRight, ShieldCheck, Zap, Lock, HardDrive, Smartphone, CheckCircle2, Users } from 'lucide-react';
 
 export const LandingPage = () => {
   return (
@@ -25,22 +25,31 @@ export const LandingPage = () => {
         </p>
 
         {/* Primary Action Buttons */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 flex-wrap">
           <Link
             to="/lab"
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-7 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm transition-all shadow-lg shadow-blue-600/30 hover:shadow-blue-500/40 hover:-translate-y-0.5"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm transition-all shadow-lg shadow-blue-600/30 hover:shadow-blue-500/40 hover:-translate-y-0.5"
           >
             <Monitor className="w-4 h-4" />
-            <span>Open Lab Workstation Mode</span>
+            <span>1-to-1 Lab Mode</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+
+          <Link
+            to="/lab?mode=group"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold text-sm transition-all shadow-lg shadow-purple-600/30 hover:shadow-purple-500/40 hover:-translate-y-0.5"
+          >
+            <Users className="w-4 h-4" />
+            <span>Group Work Mode</span>
             <ArrowRight className="w-4 h-4" />
           </Link>
 
           <Link
             to="/join"
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-7 py-3.5 rounded-xl glass-panel hover:bg-slate-800 text-slate-200 font-semibold text-sm transition-all border border-slate-700/80 hover:border-slate-600 hover:-translate-y-0.5"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-xl glass-panel hover:bg-slate-800 text-slate-200 font-semibold text-sm transition-all border border-slate-700/80 hover:border-slate-600 hover:-translate-y-0.5"
           >
             <QrCode className="w-4 h-4 text-cyan-400" />
-            <span>Connect from Phone / Laptop</span>
+            <span>Scan / Join Session</span>
           </Link>
         </div>
       </div>

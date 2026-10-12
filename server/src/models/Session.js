@@ -31,6 +31,16 @@ const sessionSchema = new mongoose.Schema(
       default: null,
       index: true,
     },
+    mode: {
+      type: String,
+      enum: ['direct', 'group'],
+      default: 'direct',
+      index: true,
+    },
+    allowMemberUpload: {
+      type: Boolean,
+      default: false,
+    },
     status: {
       type: String,
       enum: ['pending', 'paired', 'active', 'expired', 'terminated'],
